@@ -1,9 +1,16 @@
 import axios from "axios";
 import * as dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
 const apiKey = process.env.API_KEY || "";
+
+const device = process.env.DEVICE || "";
+const browser = process.env.BROWSER || "";
+const os = process.env.OS || "";
+
 const machine = process.env.MACHINE || "";
 const project = process.env.PROJECT || "";
 const branch = process.env.BRANCH || "";
@@ -23,7 +30,7 @@ function toNumber(value: string | undefined): number {
   return value !== undefined && !isNaN(+value) ? +value : 0;
 }
 
-async function sendFakeHeartbeat() {
+async function sendFakeHeartbeat(userAgent: string) {
   const fakeData = {
     project: project,
     branch: branch,
@@ -44,6 +51,7 @@ async function sendFakeHeartbeat() {
         Authorization: `Basic ${btoa(apiKey + ":")}`,
         "Content-Type": "application/json",
         "X-Machine-Name": machine,
+        "User-Agent": userAgent,
       },
     })
     .then((response) => {
@@ -58,15 +66,16 @@ async function sendFakeHeartbeat() {
     });
 }
 
-function startSending() {
+async function startSending() {
   let send = true;
   let iteral = 1;
   let count = random(workMin, workMax);
+  const userAgent = await getUserAgent();
 
-  sendFakeHeartbeat();
+  sendFakeHeartbeat(userAgent);
   setInterval(() => {
     if (send) {
-      sendFakeHeartbeat();
+      sendFakeHeartbeat(userAgent);
     }
 
     console.log(iteral + "/" + count, send ? "working" : "pause");
@@ -88,6 +97,24 @@ function startSending() {
 
 function random(min: number, max: number) {
   return Math.floor(Math.random() * max) + min;
+}
+
+async function getUserAgent() {
+  const filePath = path.join(__dirname, "user-agents.json");
+  try {
+    const data = await fs.promises.readFile(filePath, "utf8");
+    const jsonData = JSON.parse(data);
+    const result = getRandomElement(Object.keys(jsonData[device + browser + os])) + "";
+    return result;
+  } catch (parseErr) {
+    console.error(parseErr);
+    return "";
+  }
+}
+
+function getRandomElement(arr: string[]) {
+  const randomIndex = Math.floor(Math.random() * arr.length);
+  return arr[randomIndex];
 }
 
 startSending();
